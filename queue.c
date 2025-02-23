@@ -308,5 +308,50 @@ int q_descend(struct list_head *head)
 int q_merge(struct list_head *head, bool descend)
 {
     // https://leetcode.com/problems/merge-k-sorted-lists/
-    return 0;
+    if (!head || list_empty(head))
+        return 0;
+    queue_contex_t *qc = list_first_entry(head, queue_contex_t, chain);
+    if (list_is_singular(head))
+        return q_size(qc->q);
+    int offset = 1;
+    LIST_HEAD(tmp_q_head);
+    int chain_size = 0;
+    bool first_loop = true;
+    while (first_loop || offset < chain_size) {
+        int count = 1;
+        queue_contex_t *entry_qc_1 = NULL, *entry_qc_2 = NULL;
+        list_for_each_entry (entry_qc_2, head, chain) {
+            chain_size += first_loop;
+            // cppcheck-suppress knownConditionTrueFalse
+            if (--count)
+                continue;
+            // cppcheck-suppress knownConditionTrueFalse
+            if (entry_qc_1) {
+                struct list_head *q_head_1 = entry_qc_1->q;
+                struct list_head *q_head_2 = entry_qc_2->q;
+                while (!list_empty(q_head_1) && !list_empty(q_head_2)) {
+                    element_t *e_1 =
+                        list_first_entry(q_head_1, element_t, list);
+                    element_t *e_2 =
+                        list_first_entry(q_head_2, element_t, list);
+                    element_t *e =
+                        (descend && strcmp(e_1->value, e_2->value) > 0) ||
+                                (!descend && strcmp(e_1->value, e_2->value) < 0)
+                            ? e_1
+                            : e_2;
+                    list_del(&e->list);
+                    list_add_tail(&e->list, &tmp_q_head);
+                }
+                if (list_empty(q_head_1))
+                    list_splice_init(q_head_2, q_head_1);
+                list_splice_init(&tmp_q_head, q_head_1);
+            } else {
+                entry_qc_1 = entry_qc_2;
+            }
+            count = offset;
+        }
+        first_loop = false;
+        offset <<= 1;
+    }
+    return q_size(qc->q);
 }
