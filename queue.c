@@ -34,66 +34,55 @@ void q_free(struct list_head *head)
     free(head);
 }
 
+/* for q_insert_head and q_insert_tail */
+#define q_insert(head, s, add_func)                             \
+    if (!head)                                                  \
+        return false;                                           \
+    element_t *entry = (element_t *) malloc(sizeof(element_t)); \
+    if (!entry)                                                 \
+        return false;                                           \
+    entry->value = strdup(s);                                   \
+    if (!entry->value) {                                        \
+        free(entry);                                            \
+        return false;                                           \
+    }                                                           \
+    add_func(&entry->list, head);                               \
+    return true;
+
 /* Insert an element at head of queue */
 bool q_insert_head(struct list_head *head, char *s)
 {
-    if (!head)
-        return false;
-    element_t *entry = (element_t *) malloc(sizeof(element_t));
-    if (!entry)
-        return false;
-    entry->value = strdup(s);
-    if (!entry->value) {
-        free(entry);
-        return false;
-    }
-    list_add(&entry->list, head);
-    return true;
+    q_insert(head, s, list_add);
 }
 
 /* Insert an element at tail of queue */
 bool q_insert_tail(struct list_head *head, char *s)
 {
-    if (!head)
-        return false;
-    element_t *entry = (element_t *) malloc(sizeof(element_t));
-    if (!entry)
-        return false;
-    entry->value = strdup(s);
-    if (!entry->value) {
-        free(entry);
-        return false;
-    }
-    list_add_tail(&entry->list, head);
-    return true;
+    q_insert(head, s, list_add_tail);
 }
+
+/* for q_remove_head and q_remove_tail */
+#define q_remove(head, sp, bufsize, entry_getter)           \
+    if (!head || list_empty(head))                          \
+        return NULL;                                        \
+    element_t *entry = entry_getter(head, element_t, list); \
+    list_del(&entry->list);                                 \
+    if (sp && entry->value) {                               \
+        strncpy(sp, entry->value, bufsize - 1);             \
+        sp[bufsize - 1] = 0;                                \
+    }                                                       \
+    return entry;
 
 /* Remove an element from head of queue */
 element_t *q_remove_head(struct list_head *head, char *sp, size_t bufsize)
 {
-    if (!head || list_empty(head))
-        return NULL;
-    element_t *entry = list_first_entry(head, element_t, list);
-    list_del(&entry->list);
-    if (sp && entry->value) {
-        strncpy(sp, entry->value, bufsize - 1);
-        sp[bufsize - 1] = 0;
-    }
-    return entry;
+    q_remove(head, sp, bufsize, list_first_entry);
 }
 
 /* Remove an element from tail of queue */
 element_t *q_remove_tail(struct list_head *head, char *sp, size_t bufsize)
 {
-    if (!head || list_empty(head))
-        return NULL;
-    element_t *entry = list_last_entry(head, element_t, list);
-    list_del(&entry->list);
-    if (sp && entry->value) {
-        strncpy(sp, entry->value, bufsize - 1);
-        sp[bufsize - 1] = 0;
-    }
-    return entry;
+    q_remove(head, sp, bufsize, list_last_entry);
 }
 
 /* Return number of elements in queue */
@@ -189,10 +178,8 @@ void q_reverse(struct list_head *head)
     if (!head || list_empty(head))
         return;
     struct list_head *node, *safe;
-    list_for_each_safe (node, safe, head) {
-        list_del(node);
-        list_add(node, head);
-    }
+    list_for_each_safe (node, safe, head)
+        list_move(node, head);
 }
 
 /* Reverse the nodes of the list k at a time */
@@ -241,39 +228,42 @@ void q_sort(struct list_head *head, bool descend)
                                (!descend && strcmp(e_1->value, e_2->value) < 0)
                            ? e_1
                            : e_2;
-        list_del(&e->list);
-        list_add_tail(&e->list, head);
+        list_move_tail(&e->list, head);
     }
     struct list_head *tmp_head =
         list_empty(&tmp_head_1) ? &tmp_head_2 : &tmp_head_1;
     list_splice_tail_init(tmp_head, head);
 }
 
+/* for q_ascend and q_descend */
+#define q_ascend_descend(head, stop_cond)                           \
+    int ret = 0;                                                    \
+    if (!head || list_empty(head))                                  \
+        return ret;                                                 \
+    LIST_HEAD(tmp_head);                                            \
+    list_splice_init(head, &tmp_head);                              \
+    element_t *entry = NULL, *safe = NULL, *tmp_entry = NULL;       \
+    list_for_each_entry_safe (entry, safe, &tmp_head, list) {       \
+        ret++;                                                      \
+        while (!list_empty(head)) {                                 \
+            tmp_entry = list_last_entry(head, element_t, list);     \
+            if (strcmp(entry->value, tmp_entry->value) stop_cond 0) \
+                break;                                              \
+            list_del(&tmp_entry->list);                             \
+            free(tmp_entry->value);                                 \
+            free(tmp_entry);                                        \
+            ret--;                                                  \
+        }                                                           \
+        list_add_tail(&entry->list, head);                          \
+    }                                                               \
+    return ret;
+
 /* Remove every node which has a node with a strictly less value anywhere to
  * the right side of it */
 int q_ascend(struct list_head *head)
 {
     // https://leetcode.com/problems/remove-nodes-from-linked-list/
-    int ret = 0;
-    if (!head || list_empty(head))
-        return ret;
-    LIST_HEAD(tmp_head);
-    list_splice_init(head, &tmp_head);
-    element_t *entry = NULL, *safe = NULL, *tmp_entry = NULL;
-    list_for_each_entry_safe (entry, safe, &tmp_head, list) {
-        ret++;
-        while (!list_empty(head)) {
-            tmp_entry = list_last_entry(head, element_t, list);
-            if (strcmp(entry->value, tmp_entry->value) >= 0)
-                break;
-            list_del(&tmp_entry->list);
-            free(tmp_entry->value);
-            free(tmp_entry);
-            ret--;
-        }
-        list_add_tail(&entry->list, head);
-    }
-    return ret;
+    q_ascend_descend(head, >=);
 }
 
 /* Remove every node which has a node with a strictly greater value anywhere to
@@ -281,26 +271,7 @@ int q_ascend(struct list_head *head)
 int q_descend(struct list_head *head)
 {
     // https://leetcode.com/problems/remove-nodes-from-linked-list/
-    int ret = 0;
-    if (!head || list_empty(head))
-        return ret;
-    LIST_HEAD(tmp_head);
-    list_splice_init(head, &tmp_head);
-    element_t *entry = NULL, *safe = NULL, *tmp_entry = NULL;
-    list_for_each_entry_safe (entry, safe, &tmp_head, list) {
-        ret++;
-        while (!list_empty(head)) {
-            tmp_entry = list_last_entry(head, element_t, list);
-            if (strcmp(entry->value, tmp_entry->value) <= 0)
-                break;
-            list_del(&tmp_entry->list);
-            free(tmp_entry->value);
-            free(tmp_entry);
-            ret--;
-        }
-        list_add_tail(&entry->list, head);
-    }
-    return ret;
+    q_ascend_descend(head, <=);
 }
 
 /* Merge all the queues into one sorted queue, which is in ascending/descending
@@ -339,8 +310,7 @@ int q_merge(struct list_head *head, bool descend)
                                 (!descend && strcmp(e_1->value, e_2->value) < 0)
                             ? e_1
                             : e_2;
-                    list_del(&e->list);
-                    list_add_tail(&e->list, &tmp_q_head);
+                    list_move_tail(&e->list, &tmp_q_head);
                 }
                 if (list_empty(q_head_1))
                     list_splice_init(q_head_2, q_head_1);
