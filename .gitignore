@@ -7,6 +7,7 @@ qtest
 core*
 .cmd_history
 .out
+testweb
 
 # ctags files
 TAGS

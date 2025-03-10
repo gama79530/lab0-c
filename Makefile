@@ -85,4 +85,10 @@ distclean: clean
 	-rm -f .cmd_history
 	-rm -rf .out
 
+.PHONY: testweb.c
+testweb: testweb.c
+	$(Q)rm -rf $@
+	$(Q)$(CC) -o $@ $(CFLAGS) $<
+	$(Q)./$@
+
 -include $(deps)
