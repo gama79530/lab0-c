@@ -97,13 +97,14 @@ void report_event(message_t msg, char *fmt, ...)
 
 #define BUF_SIZE 4096
 extern int web_connfd;
+extern char resp_buffer[RESP_BUF_SIZE];
 void report(int level, char *fmt, ...)
 {
     if (!verbfile)
         init_files(stdout, stdout);
 
-    char buffer[BUF_SIZE];
     if (level <= verblevel) {
+        char buffer[BUF_SIZE];
         va_list ap;
         va_start(ap, fmt);
         vfprintf(verbfile, fmt, ap);
@@ -122,11 +123,14 @@ void report(int level, char *fmt, ...)
         vsnprintf(buffer, BUF_SIZE, fmt, ap);
         va_end(ap);
     }
-    if (web_connfd) {
-        int len = strlen(buffer);
-        buffer[len] = '\n';
-        buffer[len + 1] = '\0';
-        web_send(web_connfd, buffer);
+    if (web_connfd >= 0) {
+        int len = strlen(resp_buffer);
+        va_list ap;
+        va_start(ap, fmt);
+        vsnprintf(resp_buffer + len, RESP_BUF_SIZE - len, fmt, ap);
+        va_end(ap);
+        len = strlen(resp_buffer);
+        strncat(resp_buffer, "<br>", RESP_BUF_SIZE - len - 1);
     }
 }
 
@@ -135,8 +139,8 @@ void report_noreturn(int level, char *fmt, ...)
     if (!verbfile)
         init_files(stdout, stdout);
 
-    char buffer[BUF_SIZE];
     if (level <= verblevel) {
+        char buffer[BUF_SIZE];
         va_list ap;
         va_start(ap, fmt);
         vfprintf(verbfile, fmt, ap);
@@ -154,8 +158,13 @@ void report_noreturn(int level, char *fmt, ...)
         va_end(ap);
     }
 
-    if (web_connfd)
-        web_send(web_connfd, buffer);
+    if (web_connfd >= 0) {
+        int len = strlen(resp_buffer);
+        va_list ap;
+        va_start(ap, fmt);
+        vsnprintf(resp_buffer + len, RESP_BUF_SIZE - len, fmt, ap);
+        va_end(ap);
+    }
 }
 
 /* Functions denoting failures */

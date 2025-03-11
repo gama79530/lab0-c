@@ -11,6 +11,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "web.h"
+
 #define LISTENQ 1024 /* second argument to listen() */
 #define MAXLINE 1024 /* max length of a line */
 #define BUFSIZE 1024
@@ -234,6 +236,8 @@ char *web_recv(int fd, struct sockaddr_in *clientaddr)
     return ret;
 }
 
+extern int web_connfd;
+char resp_buffer[RESP_BUF_SIZE];
 int web_eventmux(char *buf)
 {
     fd_set listenset;
@@ -253,22 +257,20 @@ int web_eventmux(char *buf)
         FD_CLR(server_fd, &listenset);
         struct sockaddr_in clientaddr;
         socklen_t clientlen = sizeof(clientaddr);
-        int web_connfd =
+        web_connfd =
             accept(server_fd, (struct sockaddr *) &clientaddr, &clientlen);
 
         char *p = web_recv(web_connfd, &clientaddr);
-        char *buffer =
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/html\r\n\r\n"
-            "<!DOCTYPE html><head>"
-            "<link rel=\"shortcut icon\" href=\"#\">"
-            "</head><body>"
-            "tiny-web-server test"
-            "</body></html>\n";
-        web_send(web_connfd, buffer);
         strncpy(buf, p, strlen(p) + 1);
         free(p);
-        close(web_connfd);
+        strncpy(resp_buffer,
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html\r\n\r\n"
+                "<!DOCTYPE html><head>"
+                "<link rel=\"shortcut icon\" href=\"#\">"
+                "</head><body>"
+                "tiny-web-server test<br>",
+                RESP_BUF_SIZE);
         return strlen(buf);
     }
 
